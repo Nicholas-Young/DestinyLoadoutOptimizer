@@ -1,12 +1,9 @@
 #include <vector>
 #include <iostream>
+#include <fstream>
 #include <math.h>
 #include <string>
 #include <algorithm>
-
-using namespace std;
-
-enum statMod {mobilityMod, resilienceMod, recoveryMod, disciplineMod, intellectMod, strengthMod};
 
 struct armorPiece {
     int mobility;
@@ -16,15 +13,18 @@ struct armorPiece {
     int intellect;
     int strength;
 
-    string name;
+    std::string name;
 };
 
-struct loadout {
+class loadout {
     armorPiece headArmor;
     armorPiece armArmor;
     armorPiece chestArmor;
     armorPiece legArmor;
     armorPiece classArmor;
+
+    public:
+    loadout(armorPiece in_headArmor, armorPiece in_armArmor, armorPiece in_chestArmor, armorPiece in_legArmor, armorPiece in_classArmor) : headArmor(in_headArmor), armArmor(in_armArmor), chestArmor(in_chestArmor), legArmor(in_legArmor), classArmor(in_classArmor) {}
 
     bool operator < (const loadout& otherLoadout) const {
         int score = 0;
@@ -43,130 +43,232 @@ struct loadout {
         int otherIntellect = otherLoadout.headArmor.intellect + otherLoadout.armArmor.intellect + otherLoadout.chestArmor.intellect + otherLoadout.legArmor.intellect + otherLoadout.classArmor.intellect;
         int otherStrength = otherLoadout.headArmor.strength + otherLoadout.armArmor.strength + otherLoadout.chestArmor.strength + otherLoadout.legArmor.strength + otherLoadout.classArmor.strength;
 
-        if((loadoutDiscipline / 10) < (otherDiscipline / 10)) {
-            return true;
-        }
+        int loadoutStatLevel = loadoutMobility / 10 + loadoutResilience / 10 + loadoutRecovery / 10 + loadoutDiscipline / 10 + loadoutIntellect / 10 + loadoutStrength / 10;
+        int otherStatLevel = otherMobility / 10 + otherResilience / 10 + otherRecovery / 10 + otherDiscipline / 10 + otherIntellect / 10 + otherStrength / 10;
 
-        if (loadoutMobility % 10 >= 5) {
-            score++;
-        }
-        if (otherMobility % 10 >= 5) {
-            score--;
-        }
-
-        if(loadoutResilience % 10 >= 5) {
-            score++;
-        }
-        if(otherResilience % 10 >= 5) {
-            score--;
-        }
-
-        if (loadoutRecovery % 10 >= 5) {
-            score++;
-        }
-        if(otherRecovery % 10 >= 5) {
-            score--;
-        }
-
-        return score < 0;
+        return (loadoutStatLevel < otherStatLevel);
     }
+
+    int getMobility() const {
+        return headArmor.mobility + armArmor.mobility + chestArmor.mobility + legArmor.mobility + classArmor.mobility;
+    }
+
+    int getResilience() const {
+        return headArmor.resilience + armArmor.resilience + chestArmor.resilience + legArmor.resilience + classArmor.resilience;
+    }
+
+    int getRecovery() const {
+        return headArmor.recovery + armArmor.recovery + chestArmor.recovery + legArmor.recovery + classArmor.recovery;
+    }
+
+    int getDiscipline() const {
+        return headArmor.discipline + armArmor.discipline + chestArmor.discipline + legArmor.discipline + classArmor.discipline;
+    }
+
+    int getIntellect() const {
+        return headArmor.intellect + armArmor.intellect + chestArmor.intellect + legArmor.intellect + classArmor.intellect;
+    }
+
+    int getStrength() const {
+        return headArmor.strength + armArmor.strength + chestArmor.strength + legArmor.strength + classArmor.strength;
+    }
+
+    friend std::ostream& operator<<(std::ostream& os, const loadout& currentLoadout);
 };
 
-class guardian {
-    vector<loadout> goodLoadouts;
+std::ostream& operator<<(std::ostream& os, const loadout& currentLoadout) {
+    os << "Mobility: " << currentLoadout.getMobility() << "\nResilience: " << currentLoadout.getResilience() << "\nRecovery: " << currentLoadout.getRecovery() <<
+            "\nDiscipline: " << currentLoadout.getDiscipline() << "\nIntellect: " << currentLoadout.getIntellect() << "\nStrength: " << currentLoadout.getStrength() << "\n" <<
+            currentLoadout.headArmor.name << " / " << currentLoadout.armArmor.name << " / " << currentLoadout.chestArmor.name << " / " << currentLoadout.legArmor.name << " / " << currentLoadout.classArmor.name;
 
-    vector<armorPiece> helmets;
-    vector<armorPiece> arms;
-    vector<armorPiece> chests;
-    vector<armorPiece> legs;
-    vector<armorPiece> classArmors;
+    return os;
+}
+
+class guardian {
+    std::vector<loadout> goodLoadouts;
+
+    std::vector<armorPiece> helmets;
+    std::vector<armorPiece> arms;
+    std::vector<armorPiece> chests;
+    std::vector<armorPiece> legs;
+    std::vector<armorPiece> classArmors;
 
     int mobilityGoal, resilienceGoal, recoveryGoal, disciplineGoal, intellectGoal, strengthGoal;
+    int mobilityModifier = 0, resilienceModifier = 0, recoveryModifier = 0, disciplineModifier = 0, intellectModifier = 0, strengthModifier = 0;
 
-    bool allowChargedWithLightMods;
-
-    int getRequiredMobilityMods(int helmetIndex, int armIndex, int chestIndex, int legIndex, int classIndex) {
-        int mobilityTotal = helmets.at(helmetIndex).mobility + arms.at(armIndex).mobility + chests.at(chestIndex).mobility + legs.at(legIndex).mobility + classArmors.at(classIndex).mobility;
-        int mobilityDeficit = max(mobilityGoal - mobilityTotal, 0);
-        
-        if (allowChargedWithLightMods) {
-            mobilityDeficit = max(mobilityDeficit - 20, 0);
-        }
-
-        return ceil(mobilityDeficit / 10.0);
+    int getRequiredMods(int statTotal, int statGoal) {
+        int deficit = std::max(statGoal - statTotal, 0);
+        return ceil(deficit / 10.0);
     }
 
-    int getRequiredResilienceMods(int helmetIndex, int armIndex, int chestIndex, int legIndex, int classIndex) {
-        int resilienceTotal = helmets.at(helmetIndex).resilience + arms.at(armIndex).resilience + chests.at(chestIndex).resilience + legs.at(legIndex).resilience + classArmors.at(classIndex).resilience;
-        int resilienceDeficit = max(resilienceGoal - resilienceTotal, 0);
-
-        return ceil(resilienceDeficit / 10.0);
+    int getRequiredMobilityMods(loadout& testLoadout) {
+        int mobilityTotal = testLoadout.getMobility() + mobilityModifier;
+        return getRequiredMods(mobilityTotal, mobilityGoal);
     }
 
-    int getRequiredRecoveryMods(int helmetIndex, int armIndex, int chestIndex, int legIndex, int classIndex) {
-        int recoveryTotal = helmets.at(helmetIndex).recovery + arms.at(armIndex).recovery + chests.at(chestIndex).recovery + legs.at(legIndex).recovery + classArmors.at(classIndex).recovery;
-        int recoveryDeficit = max(recoveryGoal - recoveryTotal, 0);
-
-        return ceil(recoveryDeficit / 10.0);
+    int getRequiredResilienceMods(loadout& testLoadout) {
+        int resilienceTotal = testLoadout.getResilience() + resilienceModifier;
+        return getRequiredMods(resilienceTotal, resilienceGoal);
     }
 
-    int getRequiredDisciplineMods(int helmetIndex, int armIndex, int chestIndex, int legIndex, int classIndex) {
-        int disciplineTotal = helmets.at(helmetIndex).discipline + arms.at(armIndex).discipline + chests.at(chestIndex).discipline + legs.at(legIndex).discipline + classArmors.at(classIndex).discipline;
-        int disciplineDeficit = max(disciplineGoal - disciplineTotal, 0);
-
-        return ceil(disciplineDeficit / 10.0);
+    int getRequiredRecoveryMods(loadout& testLoadout) {
+        int recoveryTotal = testLoadout.getRecovery() + recoveryModifier;
+        return getRequiredMods(recoveryTotal, recoveryGoal);
     }
 
-    int getRequiredIntellectMods(int helmetIndex, int armIndex, int chestIndex, int legIndex, int classIndex) {
-        int intellectTotal = helmets.at(helmetIndex).intellect + arms.at(armIndex).intellect + chests.at(chestIndex).intellect + legs.at(legIndex).intellect + classArmors.at(classIndex).intellect;
-        int intellectDeficit = max(intellectGoal - intellectTotal, 0);
-
-        return ceil(intellectDeficit / 10.0);
+    int getRequiredDisciplineMods(loadout& testLoadout) {
+        int disciplineTotal = testLoadout.getDiscipline() + disciplineModifier;
+        return getRequiredMods(disciplineTotal, disciplineGoal);
     }
 
-    int getRequiredStrengthMods(int helmetIndex, int armIndex, int chestIndex, int legIndex, int classIndex) {
-        int strengthTotal = helmets.at(helmetIndex).strength + arms.at(armIndex).strength + chests.at(chestIndex).strength + legs.at(legIndex).strength + classArmors.at(classIndex).strength;
-        int strengthDeficit = max(strengthGoal - strengthTotal, 0);
-
-        if (allowChargedWithLightMods) {
-            strengthDeficit = max(strengthDeficit - 20, 0);
-        }
-
-        return ceil(strengthDeficit / 10.0);
+    int getRequiredIntellectMods(loadout& testLoadout) {
+        int intellectTotal = testLoadout.getIntellect() + intellectModifier;
+        return getRequiredMods(intellectTotal, intellectGoal);
     }
 
-    bool isLoadoutGood(int helmetIndex, int armIndex, int chestIndex, int legIndex, int classIndex) {
-        int requiredMobilityMods = getRequiredMobilityMods(helmetIndex, armIndex, chestIndex, legIndex, classIndex);
-        int requiredResilienceMods = getRequiredResilienceMods(helmetIndex, armIndex, chestIndex, legIndex, classIndex);
-        int requiredRecoveryMods = getRequiredRecoveryMods(helmetIndex, armIndex, chestIndex, legIndex, classIndex);
-        int requiredDisciplineMods = getRequiredDisciplineMods(helmetIndex, armIndex, chestIndex, legIndex, classIndex);
-        int requiredIntellectMods = getRequiredIntellectMods(helmetIndex, armIndex, chestIndex, legIndex, classIndex);
-        int requiredStrengthMods = getRequiredStrengthMods(helmetIndex, armIndex, chestIndex, legIndex, classIndex);
+    int getRequiredStrengthMods(loadout& testLoadout) {
+        int strengthTotal = testLoadout.getStrength() + strengthModifier;
+        return getRequiredMods(strengthTotal, strengthGoal);
+    }
+
+    bool isLoadoutGood(loadout& testLoadout) {
+        int requiredMobilityMods = getRequiredMobilityMods(testLoadout);
+        int requiredResilienceMods = getRequiredResilienceMods(testLoadout);
+        int requiredRecoveryMods = getRequiredRecoveryMods(testLoadout);
+        int requiredDisciplineMods = getRequiredDisciplineMods(testLoadout);
+        int requiredIntellectMods = getRequiredIntellectMods(testLoadout);
+        int requiredStrengthMods = getRequiredStrengthMods(testLoadout);
 
         return (requiredMobilityMods + requiredResilienceMods + requiredRecoveryMods + requiredDisciplineMods + requiredIntellectMods + requiredStrengthMods) <= 5;
     }
 
-    public:
-    guardian(int mobilityGoal_in, int resilienceGoal_in, int recoveryGoal_in, int disciplineGoal_in, int intellectGoal_in, int strengthGoal_in, bool allowChargedWithLightMods_in) : mobilityGoal(mobilityGoal_in), resilienceGoal(resilienceGoal_in), recoveryGoal(recoveryGoal_in), disciplineGoal(disciplineGoal_in), intellectGoal(intellectGoal_in), strengthGoal(strengthGoal_in), allowChargedWithLightMods(allowChargedWithLightMods_in) {}
-
-    void addHeadArmor(int mobility, int resilience, int recovery, int discipline, int intellect, int strength, string name) {
+    void addHeadArmor(int mobility, int resilience, int recovery, int discipline, int intellect, int strength, std::string name) {
         helmets.push_back({mobility, resilience, recovery, discipline, intellect, strength, name});
     }
 
-    void addArmArmor(int mobility, int resilience, int recovery, int discipline, int intellect, int strength, string name) {
+    void addArmArmor(int mobility, int resilience, int recovery, int discipline, int intellect, int strength, std::string name) {
         arms.push_back({mobility, resilience, recovery, discipline, intellect, strength, name});
     }
 
-    void addChestArmor(int mobility, int resilience, int recovery, int discipline, int intellect, int strength, string name) {
+    void addChestArmor(int mobility, int resilience, int recovery, int discipline, int intellect, int strength, std::string name) {
         chests.push_back({mobility, resilience, recovery, discipline, intellect, strength, name});
     }
 
-    void addLegArmor(int mobility, int resilience, int recovery, int discipline, int intellect, int strength, string name) {
+    void addLegArmor(int mobility, int resilience, int recovery, int discipline, int intellect, int strength, std::string name) {
         legs.push_back({mobility, resilience, recovery, discipline, intellect, strength, name});
     }
 
-    void addClassArmor(int mobility, int resilience, int recovery, int discipline, int intellect, int strength, string name) {
+    void addClassArmor(int mobility, int resilience, int recovery, int discipline, int intellect, int strength, std::string name) {
         classArmors.push_back({mobility, resilience, recovery, discipline, intellect, strength, name});
+    }
+
+    public:
+    guardian() : mobilityGoal(0), resilienceGoal(0), recoveryGoal(0), disciplineGoal(0), intellectGoal(0), strengthGoal(0) {}
+
+    guardian(int mobilityGoal_in, int resilienceGoal_in, int recoveryGoal_in, int disciplineGoal_in, int intellectGoal_in, int strengthGoal_in) :
+                mobilityGoal(mobilityGoal_in), resilienceGoal(resilienceGoal_in), recoveryGoal(recoveryGoal_in), disciplineGoal(disciplineGoal_in), intellectGoal(intellectGoal_in), strengthGoal(strengthGoal_in) {}
+
+    void addArmorPiecesFromFile(std::string inputFile) {
+        std::ifstream armorPieces(inputFile);
+        std::string line;
+        int mobility, resilience, recovery, discipline, intellect, strength;
+        std::string name, type;
+
+        while(std::getline(armorPieces, line)) {
+            name = line.substr(0, line.find(","));
+            line = line.substr(line.find(",") + 1);
+
+            type = line.substr(0, line.find(","));
+            line = line.substr(line.find(",") + 1);
+
+            mobility = std::stoi(line.substr(0, line.find(",")));
+            line = line.substr(line.find(",") + 1);
+
+            resilience = std::stoi(line.substr(0, line.find(",")));
+            line = line.substr(line.find(",") + 1);
+
+            recovery = std::stoi(line.substr(0, line.find(",")));
+            line = line.substr(line.find(",") + 1);
+
+            discipline = std::stoi(line.substr(0, line.find(",")));
+            line = line.substr(line.find(",") + 1);
+
+            intellect = std::stoi(line.substr(0, line.find(",")));
+            line = line.substr(line.find(",") + 1);
+
+            strength = std::stoi(line);
+
+            addArmorPiece(name, type, mobility, resilience, recovery, discipline, intellect, strength);
+        }
+    }
+
+    void addArmorPiece(std::string name, std::string type, int mobility, int resilience, int recovery, int discipline, int intellect, int strength) {
+        if (type == "head") {
+            addHeadArmor(mobility, resilience, recovery, discipline, intellect, strength, name);
+        }
+        else if (type == "arm") {
+            addArmArmor(mobility, resilience, recovery, discipline, intellect, strength, name);
+        }
+        else if (type == "chest") {
+            addChestArmor(mobility, resilience, recovery, discipline, intellect, strength, name);
+        }
+        else if (type == "leg") {
+            addLegArmor(mobility, resilience, recovery, discipline, intellect, strength, name);
+        }
+        else if (type == "class") {
+            addClassArmor(mobility, resilience, recovery, discipline, intellect, strength, name);
+        }
+        else {
+            std::cerr << "Unknown class type " << type << std::endl;
+        }
+    }
+
+    void setMobilityGoal(int goal) {
+        mobilityGoal = goal;
+    }
+
+    void setResilienceGoal(int goal) {
+        resilienceGoal = goal;
+    }
+
+    void setRecoveryGoal(int goal) {
+        recoveryGoal = goal;
+    }
+
+    void setDisciplineGoal(int goal) {
+        disciplineGoal = goal;
+    }
+
+    void setIntellectGoal(int goal) {
+        intellectGoal = goal;
+    }
+
+    void setStrengthGoal(int goal) {
+        strengthGoal = goal;
+    }
+
+    void setMobilityModifier(int modifier) {
+        mobilityModifier = modifier;
+    }
+
+    void setResilienceModifier(int modifier) {
+        resilienceModifier = modifier;
+    }
+
+    void setRecoveryModifier(int modifier) {
+        recoveryModifier = modifier;
+    }
+
+    void setDisciplineModifier(int modifier) {
+        disciplineModifier = modifier;
+    }
+
+    void setIntellectModifier(int modifier) {
+        intellectModifier = modifier;
+    }
+
+    void setStrengthModifier(int modifier) {
+        strengthModifier = modifier;
     }
 
     void generateLoadouts() {
@@ -175,15 +277,10 @@ class guardian {
                 for(int chestIndex = 0; chestIndex < chests.size(); chestIndex++) {
                     for(int legIndex = 0; legIndex < legs.size(); legIndex++) {
                         for(int classIndex = 0; classIndex < classArmors.size(); classIndex++) {
-                            if(isLoadoutGood(helmetIndex, armIndex, chestIndex, legIndex, classIndex)) {
-                                loadout goodLoadout;
-                                goodLoadout.headArmor = helmets.at(helmetIndex);
-                                goodLoadout.armArmor = arms.at(armIndex);
-                                goodLoadout.chestArmor = chests.at(chestIndex);
-                                goodLoadout.legArmor = legs.at(legIndex);
-                                goodLoadout.classArmor = classArmors.at(classIndex);
+                            loadout tempLoadout(helmets.at(helmetIndex), arms.at(armIndex), chests.at(chestIndex), legs.at(legIndex), classArmors.at(classIndex));
 
-                                goodLoadouts.push_back(goodLoadout);
+                            if(isLoadoutGood(tempLoadout)) {
+                                goodLoadouts.push_back(tempLoadout);
                             }
                         }
                     }
@@ -194,105 +291,65 @@ class guardian {
         sort(goodLoadouts.begin(), goodLoadouts.end());
     }
 
-    void printLoadouts() {
-        for (int loadoutIndex = 0; loadoutIndex < goodLoadouts.size(); loadoutIndex++) {
-            int loadoutMobility = goodLoadouts.at(loadoutIndex).headArmor.mobility + goodLoadouts.at(loadoutIndex).armArmor.mobility + goodLoadouts.at(loadoutIndex).chestArmor.mobility + goodLoadouts.at(loadoutIndex).legArmor.mobility + goodLoadouts.at(loadoutIndex).classArmor.mobility;
-            int loadoutResilience = goodLoadouts.at(loadoutIndex).headArmor.resilience + goodLoadouts.at(loadoutIndex).armArmor.resilience + goodLoadouts.at(loadoutIndex).chestArmor.resilience + goodLoadouts.at(loadoutIndex).legArmor.resilience + goodLoadouts.at(loadoutIndex).classArmor.resilience;
-            int loadoutRecovery = goodLoadouts.at(loadoutIndex).headArmor.recovery + goodLoadouts.at(loadoutIndex).armArmor.recovery + goodLoadouts.at(loadoutIndex).chestArmor.recovery + goodLoadouts.at(loadoutIndex).legArmor.recovery + goodLoadouts.at(loadoutIndex).classArmor.recovery;
-            int loadoutDiscipline = goodLoadouts.at(loadoutIndex).headArmor.discipline + goodLoadouts.at(loadoutIndex).armArmor.discipline + goodLoadouts.at(loadoutIndex).chestArmor.discipline + goodLoadouts.at(loadoutIndex).legArmor.discipline + goodLoadouts.at(loadoutIndex).classArmor.discipline;
-            int loadoutIntellect = goodLoadouts.at(loadoutIndex).headArmor.intellect + goodLoadouts.at(loadoutIndex).armArmor.intellect + goodLoadouts.at(loadoutIndex).chestArmor.intellect + goodLoadouts.at(loadoutIndex).legArmor.intellect + goodLoadouts.at(loadoutIndex).classArmor.intellect;
-            int loadoutStrength = goodLoadouts.at(loadoutIndex).headArmor.strength + goodLoadouts.at(loadoutIndex).armArmor.strength + goodLoadouts.at(loadoutIndex).chestArmor.strength + goodLoadouts.at(loadoutIndex).legArmor.strength + goodLoadouts.at(loadoutIndex).classArmor.strength;
-
-            cout << "Loadout " << loadoutIndex << ":\nMobility: " << loadoutMobility << "\nResilience: " << loadoutResilience << "\nRecovery: " << loadoutRecovery << "\nDiscipline: " << loadoutDiscipline << "\nIntellect: " << loadoutIntellect << "\nStrength: " << loadoutStrength << "\n";
-            cout << goodLoadouts.at(loadoutIndex).headArmor.name << " / " << goodLoadouts.at(loadoutIndex).armArmor.name << " / " << goodLoadouts.at(loadoutIndex).chestArmor.name << " / " << goodLoadouts.at(loadoutIndex).legArmor.name << " / " << goodLoadouts.at(loadoutIndex).classArmor.name << endl << endl;
+    void printLoadouts(size_t maxLoadouts = 20) {
+        if (goodLoadouts.size() == 0) {
+            std::cout << "\nNo loadouts found with desired stats." << std::endl << std::endl;
+        }
+        else {
+            for (int loadoutIndex = 0; loadoutIndex < std::min(maxLoadouts, goodLoadouts.size()); loadoutIndex++) {
+                std::cout << "\nLoadout " << loadoutIndex << ":\n" << goodLoadouts.at(loadoutIndex) << std::endl << std::endl;
+            }
         }
     }
 };
 
+int getNextSelection() {
+    int selection;
+
+    std::cout << "Enter selection\n" << "1. Enter desired stats\n" << "2. Add subclass stat modifiers\n" << "3. Print best loadouts\n" << "9. Quit\n" << "Selection: ";
+    std::cin >> selection;
+
+    return selection;
+}
+
+int promptInt(std::string prompt) {
+    int value;
+
+    std::cout << prompt;
+    std::cin >> value;
+
+    return value;
+}
+
 int main() {
-    guardian m_guardian(90, 90, 50, 0, 0, 0, true);
+    guardian m_guardian;
+    int selection;
 
-    //Helmets
-    m_guardian.addHeadArmor(24, 8, 4, 8, 25, 4, "Insight Rover Mask");
-    m_guardian.addHeadArmor(22, 4, 12, 17, 17, 4, "Tusked Allegiance Mask");
-    m_guardian.addHeadArmor(4, 29, 4, 14, 13, 8, "Holdfast Mask");
-    m_guardian.addHeadArmor(23, 4, 12, 15, 20, 4, "Resonant Fury Mask");
-    m_guardian.addHeadArmor(8, 9, 22, 4, 15, 18, "Shadow's Mask");
-    m_guardian.addHeadArmor(4, 17, 18, 24, 4, 10, "Equitis Shade Cowl");
-    m_guardian.addHeadArmor(20, 9, 8, 14, 11, 14, "Iron Fellowship Casque");
-    m_guardian.addHeadArmor(18, 12, 8, 21, 12, 4, "Legacy's Oath Mask");
-    m_guardian.addHeadArmor(22, 4, 12, 21, 8, 8, "Mask of the Emperor's Agent");
-    m_guardian.addHeadArmor(17, 8, 12, 4, 24, 9, "Mask of the Great Hunt");
-    m_guardian.addHeadArmor(20, 4, 14, 13, 22, 4, "Pyrrhic Ascent Mask");
-    m_guardian.addHeadArmor(14, 4, 19, 10, 12, 13, "Deep Explorer Mask");
-    m_guardian.addHeadArmor(29, 4, 4, 12, 16, 8, "Twisting Echo Mask");
-    m_guardian.addHeadArmor(9, 4, 24, 8, 16, 11, "Cowl of Righteousness");
-    m_guardian.addHeadArmor(16, 11, 8, 9, 19, 9, "Helm of the Ace-Defiant");
-    m_guardian.addHeadArmor(24, 8, 4, 4, 14, 19, "Iron Forerunner Mask");
-    m_guardian.addHeadArmor(23, 4, 9, 24, 10, 4, "Mask of Feltroc");
-    m_guardian.addHeadArmor(16, 8, 10, 4, 32, 4, "Pathfinder's Helmet");
-    m_guardian.addHeadArmor(11, 14, 12, 13, 11, 12, "Prime Zealot Mask");
+    do {
+        selection = getNextSelection();
 
-    //Arms
-    m_guardian.addArmArmor(26, 4, 8, 10, 23, 4, "Prime Zealot Gloves");
-    m_guardian.addArmArmor(24, 8, 8, 11, 14, 14, "Holdfast Grips");
-    m_guardian.addArmArmor(14, 16, 8, 8, 24, 8, "Flowing Grips (CODA)");
-    m_guardian.addArmArmor(11, 12, 13, 18, 16, 4, "Gloves of the Emperor's Agent");
-    m_guardian.addArmArmor(14, 13, 12, 8, 14, 17, "Grips of the Ace-Defiant");
-    m_guardian.addArmArmor(4, 15, 17, 11, 24, 4, "Grips of the Great Hunt");
-    m_guardian.addArmArmor(13, 4, 21, 24, 4, 8, "Iron Truage Grips");
-    m_guardian.addArmArmor(14, 18, 8, 14, 4, 20, "Legacy's Oath Grips");
-    m_guardian.addArmArmor(24, 8, 4, 17, 14, 4, "Moonfang-X7 Grips");
-    m_guardian.addArmArmor(15, 4, 20, 8, 4, 28, "Pyrrhic Ascent Grasps");
-    m_guardian.addArmArmor(18, 9, 10, 8, 4, 25, "Resonant Fury Grips");
-    m_guardian.addArmArmor(23, 4, 9, 11, 22, 4, "Prime Zealot Gloves");
-    m_guardian.addArmArmor(12, 11, 15, 12, 8, 15, "Bladesmith's Memory Grips");
-    m_guardian.addArmArmor(22, 4, 9, 22, 4, 13, "Grips of Exaltation");
-    m_guardian.addArmArmor(12, 4, 20, 9, 4, 24, "Grips of Feltroc");
-    m_guardian.addArmArmor(24, 4, 9, 10, 15, 10, "Iron Fellowship Grips");
-    m_guardian.addArmArmor(24, 11, 4, 9, 21, 4, "Iron Forerunner Grips");
-    m_guardian.addArmArmor(10, 8, 16, 15, 10, 14, "Prime Zealot Gloves");
-
-    //Chest
-    m_guardian.addChestArmor(5, 5, 31, 17, 15, 4, "Sixth Coyote A");
-    m_guardian.addChestArmor(25, 5, 13, 15, 9, 11, "Sixth Coyote B");
-    m_guardian.addChestArmor(15, 13, 11, 17, 4, 15, "Sixth Coyote C");
-    m_guardian.addChestArmor(19, 16, 5, 4, 24, 9, "Sixth Coyote D");
-
-    //Legs
-    m_guardian.addLegArmor(22, 12, 4, 12, 24, 4, "Legacy's Oath Strides A");
-    m_guardian.addLegArmor(19, 16, 4, 4, 16, 18, "Deep Explorer Strides");
-    m_guardian.addLegArmor(25, 10, 4, 8, 18, 10, "Iron Truage Boots");
-    m_guardian.addLegArmor(23, 9, 4, 10, 11, 18, "Moonfang-X7 Strides");
-    m_guardian.addLegArmor(4, 10, 24, 10, 16, 11, "Strides of the Great Hunt");
-    m_guardian.addLegArmor(8, 20, 11, 25, 8, 4, "Boots of Feltroc");
-    m_guardian.addLegArmor(18, 16, 4, 10, 14, 14, "Boots of the Emeperor's Agent");
-    m_guardian.addLegArmor(11, 4, 23, 4, 22, 11, "Flowing Boots (CODA)");
-    m_guardian.addLegArmor(17, 10, 11, 4, 21, 14, "Iron Forerunner Strides A");
-    m_guardian.addLegArmor(18, 8, 12, 4, 16, 16, "Iron Forerunner Strides B");
-    m_guardian.addLegArmor(13, 4, 20, 28, 8, 4, "Iron Forerunner Strides C");
-    m_guardian.addLegArmor(4, 13, 21, 18, 9, 8, "Iron Remembrance Strides");
-    m_guardian.addLegArmor(25, 10, 4, 17, 4, 16, "Legacy's Oath Strides B");
-    m_guardian.addLegArmor(14, 11, 12, 4, 16, 17, "Deep Explorer Strides");
-    m_guardian.addLegArmor(14, 11, 12, 10, 16, 11, "Resonant Fury Strides");
-    m_guardian.addLegArmor(9, 11, 14, 17, 17, 4, "Bladesmith's Memory Strides");
-    m_guardian.addLegArmor(17, 10, 9, 12, 17, 8, "Twisting Echo Strides");
-    m_guardian.addLegArmor(4, 9, 23, 9, 4, 24, "Boots of the Ace-Defiant");
-    m_guardian.addLegArmor(17, 16, 4, 23, 9, 4, "Equitis Shade Boots");
-    m_guardian.addLegArmor(8, 18, 14, 4, 20, 10, "Iron Fellowship Strides");
-    m_guardian.addLegArmor(11, 8, 17, 11, 18, 9, "Iron Truage Boots");
-    m_guardian.addLegArmor(8, 4, 22, 13, 12, 14, "Prime Zealot Strides");
-    m_guardian.addLegArmor(26, 8, 4, 4, 27, 4, "Red Moon Phantom Steps");
-    m_guardian.addLegArmor(11, 16, 10, 9, 11, 16, "Shadow's Strides");
-    m_guardian.addLegArmor(16, 8, 12, 14, 14, 8, "Solstice Strides (Magnificent)");
-
-    //Cloak
-    m_guardian.addClassArmor(2, 2, 2, 2, 2, 2, "Cloak of Remembrance");
-
-    m_guardian.generateLoadouts();
-    m_guardian.printLoadouts();
-
-    cout << "Done" << endl;
+        if(selection == 1) {
+            m_guardian.setMobilityGoal(promptInt("Desired Mobility: "));
+            m_guardian.setResilienceGoal(promptInt("Desired Resilience: "));
+            m_guardian.setRecoveryGoal(promptInt("Desired Recovery: "));
+            m_guardian.setDisciplineGoal(promptInt("Desired Discipline: "));
+            m_guardian.setIntellectGoal(promptInt("Desired Intellect: "));
+            m_guardian.setStrengthGoal(promptInt("Desired Strength: "));
+        }
+        else if (selection == 2) {
+            m_guardian.setMobilityModifier(promptInt("Mobility Modifier: "));
+            m_guardian.setResilienceModifier(promptInt("Resilience Modifier: "));
+            m_guardian.setRecoveryModifier(promptInt("Recovery Modifier: "));
+            m_guardian.setDisciplineModifier(promptInt("Discipline Modifier: "));
+            m_guardian.setIntellectModifier(promptInt("Intellect Modifier: "));
+            m_guardian.setStrengthModifier(promptInt("Strength Modifier: "));
+        }
+        else if (selection == 3) {
+            m_guardian.addArmorPiecesFromFile("armorPieces.txt");
+            m_guardian.generateLoadouts();
+            m_guardian.printLoadouts();
+        }
+    } while (selection != 9);
 
     return 0;
 }
