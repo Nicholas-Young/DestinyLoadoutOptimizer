@@ -93,6 +93,8 @@ class guardian {
     std::vector<armorPiece> legs;
     std::vector<armorPiece> classArmors;
 
+    armorPiece maxStatHelmet, maxStatArm, maxStatChest, maxStatLeg, maxStatClassArmor;
+
     int mobilityGoal, resilienceGoal, recoveryGoal, disciplineGoal, intellectGoal, strengthGoal;
     int mobilityModifier = 0, resilienceModifier = 0, recoveryModifier = 0, disciplineModifier = 0, intellectModifier = 0, strengthModifier = 0;
 
@@ -144,22 +146,100 @@ class guardian {
 
     void addHeadArmor(int mobility, int resilience, int recovery, int discipline, int intellect, int strength, std::string name) {
         helmets.push_back({mobility, resilience, recovery, discipline, intellect, strength, name});
+
+        maxStatHelmet.mobility = std::max(maxStatHelmet.mobility, mobility);
+        maxStatHelmet.resilience = std::max(maxStatHelmet.resilience, resilience);
+        maxStatHelmet.recovery = std::max(maxStatHelmet.recovery, recovery);
+        maxStatHelmet.discipline = std::max(maxStatHelmet.discipline, discipline);
+        maxStatHelmet.intellect = std::max(maxStatHelmet.intellect, intellect);
+        maxStatHelmet.strength = std::max(maxStatHelmet.strength, strength);
     }
 
     void addArmArmor(int mobility, int resilience, int recovery, int discipline, int intellect, int strength, std::string name) {
         arms.push_back({mobility, resilience, recovery, discipline, intellect, strength, name});
+
+        maxStatArm.mobility = std::max(maxStatArm.mobility, mobility);
+        maxStatArm.resilience = std::max(maxStatArm.resilience, resilience);
+        maxStatArm.recovery = std::max(maxStatArm.recovery, recovery);
+        maxStatArm.discipline = std::max(maxStatArm.discipline, discipline);
+        maxStatArm.intellect = std::max(maxStatArm.intellect, intellect);
+        maxStatArm.strength = std::max(maxStatArm.strength, strength);
     }
 
     void addChestArmor(int mobility, int resilience, int recovery, int discipline, int intellect, int strength, std::string name) {
         chests.push_back({mobility, resilience, recovery, discipline, intellect, strength, name});
+
+        maxStatChest.mobility = std::max(maxStatChest.mobility, mobility);
+        maxStatChest.resilience = std::max(maxStatChest.resilience, resilience);
+        maxStatChest.recovery = std::max(maxStatChest.recovery, recovery);
+        maxStatChest.discipline = std::max(maxStatChest.discipline, discipline);
+        maxStatChest.intellect = std::max(maxStatChest.intellect, intellect);
+        maxStatChest.strength = std::max(maxStatChest.strength, strength);
     }
 
     void addLegArmor(int mobility, int resilience, int recovery, int discipline, int intellect, int strength, std::string name) {
         legs.push_back({mobility, resilience, recovery, discipline, intellect, strength, name});
+
+        maxStatLeg.mobility = std::max(maxStatLeg.mobility, mobility);
+        maxStatLeg.resilience = std::max(maxStatLeg.resilience, resilience);
+        maxStatLeg.recovery = std::max(maxStatLeg.recovery, recovery);
+        maxStatLeg.discipline = std::max(maxStatLeg.discipline, discipline);
+        maxStatLeg.intellect = std::max(maxStatLeg.intellect, intellect);
+        maxStatLeg.strength = std::max(maxStatLeg.strength, strength);
     }
 
     void addClassArmor(int mobility, int resilience, int recovery, int discipline, int intellect, int strength, std::string name) {
         classArmors.push_back({mobility, resilience, recovery, discipline, intellect, strength, name});
+
+        maxStatClassArmor.mobility = std::max(maxStatClassArmor.mobility, mobility);
+        maxStatClassArmor.resilience = std::max(maxStatClassArmor.resilience, resilience);
+        maxStatClassArmor.recovery = std::max(maxStatClassArmor.recovery, recovery);
+        maxStatClassArmor.discipline = std::max(maxStatClassArmor.discipline, discipline);
+        maxStatClassArmor.intellect = std::max(maxStatClassArmor.intellect, intellect);
+        maxStatClassArmor.strength = std::max(maxStatClassArmor.strength, strength);
+    }
+
+    bool shouldProceed(int helmetIndex = -1, int armIndex = -1, int chestIndex = -1, int legIndex = -1, int classIndex = -1) {
+        armorPiece currentHelmet, currentArm, currentChest, currentLeg, currentClassArmor;
+
+        if (helmetIndex == -1) {
+            currentHelmet = maxStatHelmet;
+        }
+        else {
+            currentHelmet = helmets.at(helmetIndex);
+        }
+
+        if (armIndex == -1) {
+            currentArm = maxStatArm;
+        }
+        else {
+            currentArm = arms.at(armIndex);
+        }
+
+        if (chestIndex == -1) {
+            currentChest = maxStatChest;
+        }
+        else {
+            currentChest = chests.at(chestIndex);
+        }
+
+        if (legIndex == -1) {
+            currentLeg = maxStatLeg;
+        }
+        else {
+            currentLeg = legs.at(legIndex);
+        }
+
+        if (classIndex == -1) {
+            currentClassArmor = maxStatClassArmor;
+        }
+        else {
+            currentClassArmor = classArmors.at(classIndex);
+        }
+
+        loadout testLoadout = loadout(currentHelmet, currentArm, currentChest, currentLeg, currentClassArmor);
+
+        return isLoadoutGood(testLoadout);
     }
 
     public:
@@ -273,14 +353,22 @@ class guardian {
 
     void generateLoadouts() {
         for(int helmetIndex = 0; helmetIndex < helmets.size(); helmetIndex++) {
-            for(int armIndex = 0; armIndex < arms.size(); armIndex++) {
-                for(int chestIndex = 0; chestIndex < chests.size(); chestIndex++) {
-                    for(int legIndex = 0; legIndex < legs.size(); legIndex++) {
-                        for(int classIndex = 0; classIndex < classArmors.size(); classIndex++) {
-                            loadout tempLoadout(helmets.at(helmetIndex), arms.at(armIndex), chests.at(chestIndex), legs.at(legIndex), classArmors.at(classIndex));
+            if (shouldProceed(helmetIndex)) {
+                for (int armIndex = 0; armIndex < arms.size(); armIndex++) {
+                    if (shouldProceed(helmetIndex, armIndex)) {
+                        for (int chestIndex = 0; chestIndex < chests.size(); chestIndex++) {
+                            if (shouldProceed(helmetIndex, armIndex, chestIndex)) {
+                                for (int legIndex = 0; legIndex < legs.size(); legIndex++) {
+                                    if (shouldProceed(helmetIndex, armIndex, chestIndex, legIndex)) {
+                                        for (int classIndex = 0; classIndex < classArmors.size(); classIndex++) {
+                                            loadout tempLoadout(helmets.at(helmetIndex), arms.at(armIndex), chests.at(chestIndex), legs.at(legIndex), classArmors.at(classIndex));
 
-                            if(isLoadoutGood(tempLoadout)) {
-                                goodLoadouts.push_back(tempLoadout);
+                                            if (isLoadoutGood(tempLoadout)) {
+                                                goodLoadouts.push_back(tempLoadout);
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
